@@ -1,0 +1,53 @@
+---
+- name: Deploy and Secure WordPress
+  hosts: wordpress
+  become: yes
+  vars:
+    domain_name: 13.49.243.249.nip.io
+    admin_email: rejahmuhammed@gmail.com
+    # (db_vars, etc. are still here)
+
+  tasks:
+    # (All the previous tasks for packages, database, wordpress are the same)
+    # ...
+
+    - name: Obtain Let's Encrypt SSL certificate (if it doesn't exist)
+      ansible.builtin.command: >
+        certbot certonly --nginx --agree-tos --email {{ admin_email }} -d {{ domain_name }}
+      args:
+        creates: /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem
+
+    - name: Create final Nginx configuration with SSL
+      ansible.builtin.copy:
+        dest: /etc/nginx/sites-available/default
+        content: |
+          server {
+              listen 80;
+              server_name {{ domain_name }};
+              # Redirect all HTTP traffic to HTTPS
+              return 301 https://$host$request_uri;
+          }
+
+          server {
+              listen 443 ssl;
+              server_name {{ domain_name }};
+
+              root /var/www/html;
+              index index.php index.html index.htm;
+
+              ssl_certificate /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem;
+              ssl_certificate_key /etc/letsencrypt/live/{{ domain_name }}/privkey.pem;
+
+              location / {
+                      try_files $uri $uri/ /index.php?$args;
+              }
+
+              location ~ \.php$ {
+                      include snippets/fastcgi-php.conf;
+                      fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+              }
+          }
+      notify: Restart Nginx
+
+    # (All the other tasks for permissions, phpmyadmin, etc. are the same)
+    # ...

@@ -1,0 +1,1 @@
+wordpress ansible_host=13.49.243.249 ansible_user=ubuntu ansible_private_key_file=~/.ssh/my-wordpress-key.pem
